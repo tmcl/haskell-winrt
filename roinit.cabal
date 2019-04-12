@@ -1,4 +1,5 @@
-name: roinit
+name: winrt-hs
+description: haskell access to WinRT/UWP protocols
 version: 0.1
 license: BSD3
 author: Tristan
