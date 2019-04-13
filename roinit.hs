@@ -6,9 +6,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE GADTs #-}
 
 module Main where
 
+import Unsafe.Coerce
 import Numeric
 import Foreign.C hiding (CWString)
 import Foreign.Ptr
@@ -94,15 +96,37 @@ class HasIID a where
   getIid ∷ IID (Ptr a)
 
 -- actually, this is a pointer to a bunch of function pointers
-type IInspectable = Ptr (Ptr ())
-type Inspectable' = Ptr IInspectable
-type Inspectable = ForeignPtr IInspectable
+newtype IInspectable = I IInspectableG
+type IInspectableG = Ptr (Ptr ())
+type Inspectable' = Ptr IInspectableG
+type Inspectable = ForeignPtr IInspectableG
+
+class HasUnknown a where
+   getOffset ∷ Int
+
+instance HasUnknown IInspectable where
+   getOffset = 0
+
+data HasUnknown a ⇒ IUnknownVtbl a b where 
+   QueryInterface ∷ IUnknownVtbl (Ptr b → Ptr (IID c) → Ptr c → IO HRESULT) b
+   AddRef ∷ IUnknownVtbl (Ptr b → IO ()) b
+   Release ∷ IUnknownVtbl (Ptr b → IO ()) b
+
+offset ∷ IUnknownVtbl a b → Int
+offset (QueryInterface o) = 0 + o
+offset (AddRef o) = 1 + o
+offset (Release o) = 2 + o
 
 data WinRtClass a = WinRtClass GUID a
 
 type QueryInterfaceType b = Inspectable' → Ptr (IID b) → Ptr b → IO HRESULT
 foreign import ccall "dynamic"
-   mkQIT :: FunPtr (QueryInterfaceType b) → QueryInterfaceType b
+   mkQIT_ :: FunPtr (CInt → IO HRESULT) → CInt → IO HRESULT
+-- foreign import ccall "dynamic"
+   -- mkQIT_ :: ∀ a. FunPtr a → a
+
+mkQIT ∷ FunPtr a → a
+mkQIT f' = unsafeCoerce $ mkQIT_ (castFunPtr f')
 
 data IApplication
 type Application' = Ptr IApplication
@@ -128,15 +152,23 @@ queryInterface insp = do
    out ← (throwHResult =<<) . alloca2 $ \ p_iid p_out → do
       poke p_iid iid
       withForeignPtr insp $ \p_insp → do
-         struct ← peek p_insp
-         vtbl ← peek struct
-         let 
-            q = mkQIT $ (castPtrToFunPtr ∷ Ptr () → FunPtr b) vtbl
+         vtbl  ← peek p_insp
+         q ← mkF (QueryInterface 0) vtbl
          hres ← q p_insp p_iid p_out
          out ← peek p_out
          return (hres, out)
    liftIO $ newForeignPtr_  out
  
+mkF ∷ IUnknownVtbl a b → Ptr (Ptr ()) → IO a
+mkF vtbl_fun vtbl = do
+   let theoffset = offset vtbl_fun
+   cfun ← peekByteOff vtbl theoffset
+   return $ mkQIT (castPtrToFunPtr cfun)
+ 
+getF ∷ IUnknownVtbl a b → Ptr (Ptr ()) → IO (FunPtr a)
+getF vtbl_fun vtbl = do
+   let theoffset = offset vtbl_fun
+   castPtrToFunPtr <$> peekByteOff vtbl theoffset
 
       
 -- | To adequately understand HSTRINGs, consider reading
@@ -197,27 +229,23 @@ textToHSTRING t = do
    -- okay, so if we're here nothing went wrong
    -- lets attach a finaliser and wrap it up
    hstr'fp ← liftIO $ do
-      --cfp_WindowsDeleteString ← mkWindowsDeleteString 
-      --   c_WindowsDeleteString
       newForeignPtr cfp_WindowsDeleteString hstr'
    pure $ HSTRING hstr'fp
-
-foreign import ccall "wrapper"
-   mkWindowsDeleteString :: (HSTRING' → IO ()) 
-                          → IO (FunPtr (HSTRING' → IO ()))
 
 
 activateInstance ∷ HSTRING → WinRtStep Inspectable
 activateInstance (HSTRING fp_appClassName) = do
-   inspApp ← (throwHResult =<<) . liftIO $ do
+   (release, inspApp) ← (throwHResult =<<) . liftIO $ do
       withForeignPtr fp_appClassName $ \p_appClassName → do
          alloca $ \p_inspApp → do
             hres ← c_RoActivateInstance p_appClassName p_inspApp
             inspApp ← peek p_inspApp
-            return (hres, inspApp)
+            inspApp' ← peek inspApp
+            release ← getF (Release 0) inspApp'
+            return (hres, (release, inspApp))
    -- TODO: release the inspapp
-   liftIO $ newForeignPtr_ inspApp
-   
+   liftIO $ newForeignPtr release inspApp
+
 type WinRtStep = ExceptT HRESULT IO
 
 mkWchar_t ∷ Text → IO (ForeignPtr CWchar, CUInt)
