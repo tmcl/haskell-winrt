@@ -6,13 +6,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE GADTs #-}
 
 module Main where
 
-import Unsafe.Coerce
 import Numeric
-import Foreign.C hiding (CWString)
+import Foreign.C
 import Foreign.Ptr
 import Foreign.ForeignPtr
 --import qualified Foreign.Concurrent as C
@@ -27,7 +25,7 @@ import Debug.Trace
 import GHC.Word
 
 type HRESULT = CUInt
-type CWString = Ptr GHC.Word.Word16 -- on windows, wchar_t ~= unsigned short
+-- type CWString = Ptr GHC.Word.Word16 -- on windows, wchar_t ~= unsigned short
 
 foreign import ccall "RoInitialize"
     c_RoInitialize :: CUInt → IO HRESULT
@@ -44,89 +42,25 @@ foreign import ccall "&WindowsDeleteString"
 foreign import ccall "RoActivateInstance"
     c_RoActivateInstance :: HSTRING' → Ptr Inspectable' → IO HRESULT
 
--- a guid is a uuid, except that it 
--- is little endian (altho it includes
--- a byte array, so parts of it look BE).
--- therefore don't unguid it; instead
--- use toUUID
-data GUID = GUID
- !Word32
- !Word16
- !Word16
- !Word8 !Word8
- !Word8 !Word8 !Word8 !Word8 !Word8 !Word8
-
-
-instance Storable GUID where
-    sizeOf _ = 16
-    alignment _ = 4
-
-    peekByteOff p off =
-       GUID
-             <$> peekByteOff p off -- Word32
-             <*> peekByteOff p (off+4) -- Word16
-             <*> peekByteOff p (off+6) -- Word16
-             <*> peekByteOff p (off+8) -- Word8
-             <*> peekByteOff p (off+9) -- Word8
-             <*> peekByteOff p (off+10) -- Word8
-             <*> peekByteOff p (off+11) -- Word8
-             <*> peekByteOff p (off+12) -- Word8
-             <*> peekByteOff p (off+13) -- Word8
-             <*> peekByteOff p (off+14) -- Word8
-             <*> peekByteOff p (off+15) -- Word8
-        
-
-    pokeByteOff p off 
-          (GUID x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10) = 
-              do
-                pokeByteOff p off x0
-                pokeByteOff p (off+4) x1
-                pokeByteOff p (off+6) x2
-                pokeByteOff p (off+8) x3
-                pokeByteOff p (off+9) x4
-                pokeByteOff p (off+10) x5
-                pokeByteOff p (off+11) x6
-                pokeByteOff p (off+12) x7
-                pokeByteOff p (off+13) x8
-                pokeByteOff p (off+14) x9
-                pokeByteOff p (off+15) x10
 
 
 class HasIID a where
   getIid ∷ IID (Ptr a)
 
 -- actually, this is a pointer to a bunch of function pointers
-newtype IInspectable = I IInspectableG
-type IInspectableG = Ptr (Ptr ())
-type Inspectable' = Ptr IInspectableG
-type Inspectable = ForeignPtr IInspectableG
-
-class HasUnknown a where
-   getOffset ∷ Int
-
-instance HasUnknown IInspectable where
-   getOffset = 0
-
-data HasUnknown a ⇒ IUnknownVtbl a b where 
-   QueryInterface ∷ IUnknownVtbl (Ptr b → Ptr (IID c) → Ptr c → IO HRESULT) b
-   AddRef ∷ IUnknownVtbl (Ptr b → IO ()) b
-   Release ∷ IUnknownVtbl (Ptr b → IO ()) b
-
-offset ∷ IUnknownVtbl a b → Int
-offset (QueryInterface o) = 0 + o
-offset (AddRef o) = 1 + o
-offset (Release o) = 2 + o
+type IInspectable = Ptr (Ptr (FunPtr (CInt → CInt)))
+type Inspectable' = Ptr IInspectable
+type Inspectable = ForeignPtr IInspectable
 
 data WinRtClass a = WinRtClass GUID a
 
 type QueryInterfaceType b = Inspectable' → Ptr (IID b) → Ptr b → IO HRESULT
 foreign import ccall "dynamic"
-   mkQIT_ :: FunPtr (CInt → IO HRESULT) → CInt → IO HRESULT
--- foreign import ccall "dynamic"
-   -- mkQIT_ :: ∀ a. FunPtr a → a
+   mkQIT :: FunPtr (QueryInterfaceType b) → QueryInterfaceType b
 
-mkQIT ∷ FunPtr a → a
-mkQIT f' = unsafeCoerce $ mkQIT_ (castFunPtr f')
+type GetIIds = Inspectable' → Ptr CUInt → Ptr GUID → IO HRESULT
+foreign import ccall "dynamic"
+   mkGetIIds :: FunPtr GetIIds → GetIIds
 
 data IApplication
 type Application' = Ptr IApplication
@@ -152,23 +86,49 @@ queryInterface insp = do
    out ← (throwHResult =<<) . alloca2 $ \ p_iid p_out → do
       poke p_iid iid
       withForeignPtr insp $ \p_insp → do
-         vtbl  ← peek p_insp
-         q ← mkF (QueryInterface 0) vtbl
+         struct ← peek p_insp
+         vtbl :: Ptr (FunPtr (CInt → CInt)) ← peek struct
+         -- alloca2 $ \p_iid_len p_iids → do
+         --    let n = sizeOf vtbl
+         --    let getIids = mkGetIIds $ (castPtrToFunPtr ∷ Ptr (FunPtr b) → FunPtr b) (vtbl `plusPtr` (3*n) )
+         --    putStrLn "asking the iids"
+         --    hres ← getIids p_insp p_iid_len p_iids
+         --    print $ showHex hres ""
+         --    when (hres < 0x8000_0000) $ do
+         --       putStrLn "describing the iids"
+         --       len ← peek p_iid_len
+         --       print len
+         let 
+            q = mkQIT $ (castPtrToFunPtr ∷ Ptr (FunPtr a) → FunPtr b) vtbl
+         putStrLn "running the qit"
          hres ← q p_insp p_iid p_out
+         putStrLn "ran it "
+         print hres
          out ← peek p_out
          return (hres, out)
-   liftIO $ newForeignPtr_  out
+   o ← liftIO $ newForeignPtr_  out
+   makeitwork o
+   pure o
+
+makeitwork :: Application → WinRtStep ()
+makeitwork app = 
+   (throwHResult =<<) . liftIO . 
+      withForeignPtr app $ \p_app → do
+         let p_insp = castPtr p_app
+         struct ← peek p_insp
+         vtbl :: Ptr (FunPtr (CInt → CInt)) ← peek struct
+         alloca2 $ \p_iid_len p_iids → do
+            let n = 4 * 8
+            let getIids :: () = mkGetIIds $ (castPtrToFunPtr ∷ Ptr (FunPtr b) → FunPtr b) (vtbl `plusPtr` (24) )
+            putStrLn "asking the iids"
+            hres ← getIids p_insp p_iid_len p_iids
+            print $ showHex hres ""
+            when (hres < 0x8000_0000) $ do
+               putStrLn "describing the iids"
+               len ← peek p_iid_len
+               print len
+            return (hres, ())
  
-mkF ∷ IUnknownVtbl a b → Ptr (Ptr ()) → IO a
-mkF vtbl_fun vtbl = do
-   let theoffset = offset vtbl_fun
-   cfun ← peekByteOff vtbl theoffset
-   return $ mkQIT (castPtrToFunPtr cfun)
- 
-getF ∷ IUnknownVtbl a b → Ptr (Ptr ()) → IO (FunPtr a)
-getF vtbl_fun vtbl = do
-   let theoffset = offset vtbl_fun
-   castPtrToFunPtr <$> peekByteOff vtbl theoffset
 
       
 -- | To adequately understand HSTRINGs, consider reading
@@ -217,35 +177,39 @@ throwHResult (hres, a)
    | hres >= 0x8000_0000 = trace (showHex hres " error") $ throwError hres
    | otherwise = pure a
 
-textToHSTRING ∷ Text → WinRtStep HSTRING
+textToHSTRING ∷ String → WinRtStep HSTRING
 textToHSTRING t = do
    -- fpHstr is a pointer to a pointer
-   hstr' ← (throwHResult =<<) . liftIO $ do
-      alloca $ \pHstr → do
-         useAsPtr t $ \pTextBuf len → do
+   hstr' ← (throwHResult =<<) . liftIO . 
+      alloca $ \pHstr → 
+         withCWStringLen t $ \(pTextBuf, len) → do
             hres ← c_WindowsCreateString pTextBuf (fromIntegral len)  pHstr
             hstr' ← peek pHstr
             return (hres, hstr')
    -- okay, so if we're here nothing went wrong
    -- lets attach a finaliser and wrap it up
-   hstr'fp ← liftIO $ do
+   hstr'fp ← liftIO $
+      --cfp_WindowsDeleteString ← mkWindowsDeleteString 
+      --   c_WindowsDeleteString
       newForeignPtr cfp_WindowsDeleteString hstr'
    pure $ HSTRING hstr'fp
+
+foreign import ccall "wrapper"
+   mkWindowsDeleteString :: (HSTRING' → IO CUInt) 
+                          → IO (FunPtr (HSTRING' → IO CUInt))
 
 
 activateInstance ∷ HSTRING → WinRtStep Inspectable
 activateInstance (HSTRING fp_appClassName) = do
-   (release, inspApp) ← (throwHResult =<<) . liftIO $ do
-      withForeignPtr fp_appClassName $ \p_appClassName → do
+   inspApp ← (throwHResult =<<) . liftIO .
+      withForeignPtr fp_appClassName $ \p_appClassName → 
          alloca $ \p_inspApp → do
             hres ← c_RoActivateInstance p_appClassName p_inspApp
             inspApp ← peek p_inspApp
-            inspApp' ← peek inspApp
-            release ← getF (Release 0) inspApp'
-            return (hres, (release, inspApp))
+            return (hres, inspApp)
    -- TODO: release the inspapp
-   liftIO $ newForeignPtr release inspApp
-
+   liftIO $ newForeignPtr_ inspApp
+   
 type WinRtStep = ExceptT HRESULT IO
 
 mkWchar_t ∷ Text → IO (ForeignPtr CWchar, CUInt)

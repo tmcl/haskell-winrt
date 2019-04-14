@@ -6,11 +6,20 @@ author: Tristan
 build-type: Simple
 cabal-version: >=1.10
 
-executable roinit
-  main-is: roinit.hs
-  ghc-options: -Wall -Werror
+executable roinit2
+  main-is: roinit2.hs
+  other-modules: GUID
+  ghc-options: -Wall
   extra-libraries: windowsapp
   default-language: Haskell2010
   build-depends: base, text, mtl
 
+executable roinit
+  main-is: roinit.hs
+  other-modules: GUID
+  ghc-options: -Wall
+  extra-libraries: windowsapp
+  default-language: Haskell2010
+  build-depends: base, text, mtl
+  buildable: False
 
