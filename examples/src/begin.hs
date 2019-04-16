@@ -9,6 +9,12 @@ main = do
    print res
 
 it :: WinRT ()
-it = liftIO $ putStrLn "initialised"
+it = do
+   liftIO $ putStrLn "initialised"
+   insp ← newInspectable $ pack "Windows.UI.Xaml.Application"
+   app ← queryInterface 
+   liftIO $ putStrLn "created"
+   
+
 
 

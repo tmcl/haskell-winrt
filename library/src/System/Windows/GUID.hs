@@ -1,7 +1,12 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module System.Windows.GUID where
 
 import Foreign
 import Numeric
+
+newtype IID a = IID GUID
+   deriving (Storable)
 
 -- a guid is a uuid, except that it 
 -- is little endian (altho it includes

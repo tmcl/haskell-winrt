@@ -19,6 +19,9 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     System.Windows.WinRT
+    System.Windows.WinRT.HString
+    System.Windows.GUID
+    System.Windows.WinRT.Inspectable
   other-modules:
     System.Windows.WinRT.Monad
     System.Windows.WinRT.RoInit
@@ -26,7 +29,9 @@ library
   build-depends:       
     base >=4.12 && <4.13, 
     Win32 >= 2.6 && <3,
-    mtl >= 2.2.2 && < 3
+    mtl >= 2.2.2 && < 3,
+    haskell-winrt-lowlevel
   hs-source-dirs:      src
   default-language:    Haskell2010
-  default-extensions: UnicodeSyntax, NumericUnderscores
+  default-extensions: UnicodeSyntax, NumericUnderscores, RecordWildCards, ScopedTypeVariables
+  extra-libraries: windowsapp
