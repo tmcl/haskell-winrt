@@ -22,9 +22,13 @@ library
     System.Windows.WinRT.HString
     System.Windows.GUID
     System.Windows.WinRT.Inspectable
-  other-modules:
+    System.Windows.WinRT.IUnknown
     System.Windows.WinRT.Monad
     System.Windows.WinRT.RoInit
+  other-modules:
+    System.Windows.WinRT.Inspectable.NewInspectable
+    System.Windows.WinRT.Inspectable.QueryInterface
+    System.Windows.WinRT.Inspectable.TheInterface
   -- other-extensions:
   build-depends:       
     base >=4.12 && <4.13, 
@@ -35,3 +39,4 @@ library
   default-language:    Haskell2010
   default-extensions: UnicodeSyntax, NumericUnderscores, RecordWildCards, ScopedTypeVariables
   extra-libraries: windowsapp
+  ghc-options: -Wall -Werror
