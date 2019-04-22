@@ -1,11 +1,10 @@
 module Windows.UI.Xaml.Application.IApplicationStatics where
 
-import qualified Windows.UI.Xaml.Application
 import Windows.UI.Xaml.Application hiding (classId, iid)
-import Windows.UI.Xaml.Application.IApplicationInitializationCallbackParams hiding (iid)
+import Windows.UI.Xaml.Application.IApplicationInitializationCallback hiding (iid)
+-- import Windows.UI.Xaml.Application.IApplicationInitializationCallbackParams hiding (iid)
 import Foreign
 import System.Windows.GUID
-import System.Windows.WinRT.HString
 import System.Windows.WinRT.Inspectable
 import System.Windows.WinRT.IUnknown hiding (iid)
 import System.Windows.WinRT.Monad
@@ -23,19 +22,30 @@ instance Storable Uri where
    poke _ _  = error "uri stub poke"
 
 newtype ComponentResourceLocation = ComponentResourceLocation Int32
-componentResourceLocationApplication = 0
-componentResourceLocationNested = 1
+componentResourceLocationApplication :: ComponentResourceLocation
+componentResourceLocationApplication = ComponentResourceLocation 0
+componentResourceLocationNested :: ComponentResourceLocation
+componentResourceLocationNested = ComponentResourceLocation 1
 
 iid :: IID IApplicationStaticsVtbl 
 iid = IID $ GUID 0x06499997 0xF7B4 0x45FE 0xB7 0x63 0x75 0x77 0xD1 0xD3 0xCB 0x4A
 
 data IApplicationStaticsVtbl = IApplicationStaticsVtbl {
    inspectable :: IInspectableVtbl,
-   cfp_get_Current :: FunPtr (Ptr (Ptr IApplication) → HRESULT),
-   cfp_Start :: FunPtr (Ptr IApplicationInitializationCallbackParams → HRESULT),
-   cfp_LoadComponent :: FunPtr (Ptr IInspectable → Ptr Uri → HRESULT),
-   cfp_LoadComponentWithResourceLocation :: FunPtr (Ptr IInspectable → Ptr Uri →ComponentResourceLocation → HRESULT)
+   cfp_get_Current :: FunPtr CurrentGetter,
+   cfp_Start :: FunPtr Starter,
+   cfp_LoadComponent :: FunPtr (Ptr IApplicationStatics → Ptr IInspectable → Ptr Uri → IO HRESULT),
+   cfp_LoadComponentWithResourceLocation :: FunPtr (Ptr IApplicationStatics → Ptr IInspectable → Ptr Uri →ComponentResourceLocation → IO HRESULT)
 }
+
+
+type CurrentGetter = Ptr IApplicationStatics → Ptr (Ptr IApplication) → IO HRESULT
+foreign import ccall "dynamic"
+      mkCurrentGetter :: FunPtr CurrentGetter → CurrentGetter
+
+type Starter = Ptr IApplicationStatics → Ptr IApplicationInitializationCallback → IO HRESULT
+foreign import   ccall "dynamic"
+      mkStart :: FunPtr Starter → Starter
 
 inspectableSize :: Int
 inspectableSize = sizeOf (undefined :: IInspectableVtbl)

@@ -5,8 +5,8 @@ module System.Windows.GUID where
 import Foreign
 import Numeric
 
-newtype IID a = IID GUID
-   deriving (Storable)
+newtype IID a = IID {uniid :: GUID}
+   deriving (Storable, Show, Eq)
 
 -- a guid is a uuid, except that it 
 -- is little endian (altho it includes
@@ -19,6 +19,7 @@ data GUID = GUID
  !Word16
  !Word8 !Word8
  !Word8 !Word8 !Word8 !Word8 !Word8 !Word8
+   deriving (Eq)
 
 instance Show GUID where
    show (GUID d1 d2 d3 d4_0 d4_1 d4_2 d4_3 d4_4 d4_5 d4_6 d4_7) =

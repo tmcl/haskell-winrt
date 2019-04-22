@@ -16,13 +16,24 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
+-- library
+--   exposed-modules:             Main
+--   -- other-modules:
+--   -- other-extensions:
+--   build-depends:       base >=4.12 && <4.13, haskell-winrt, haskell-winrt-foundation, Win32
+--   hs-source-dirs:      src
+--   default-language:    Haskell2010
+--   default-extensions: UnicodeSyntax
+--   ghc-options: -shared  -Wall -Werror
+
 executable begin
   main-is:             begin.hs
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13, haskell-winrt, haskell-winrt-foundation, Win32
   hs-source-dirs:      src
+  c-sources: c.c
   default-language:    Haskell2010
-  extra-libraries: windowsapp
   default-extensions: UnicodeSyntax
-  ghc-options: -threaded
+  ghc-options: -Wall -optl-mwindows -optl-Wl,--dynamicbase,--export-all-symbols -optl-Wl,--nxcompat
+  ghc-options: -fprint-unicode-syntax -fprint-explicit-foralls

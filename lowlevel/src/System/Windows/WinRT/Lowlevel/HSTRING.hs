@@ -1,13 +1,11 @@
 module System.Windows.WinRT.Lowlevel.HSTRING
 where
 
-import Foreign
+import Foreign hiding (void)
 import Foreign.C
-import Foreign.Marshal.Alloc
-import System.Win32.Types (HRESULT)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.IO.Class
 import System.Windows.WinRT.Lowlevel.Monad
+import Control.Monad
 
 newtype HString = HString (ForeignPtr HSTRING__)
 
@@ -27,6 +25,6 @@ foreign import ccall "&WindowsDeleteString"
 pack :: String → HString
 pack str = unsafePerformIO . alloca $ \p_hstring →
       withCWStringLen str $ \(c_str, len) → do
-         c_WindowsCreateString c_str (fromIntegral len) p_hstring
+         void $ c_WindowsCreateString c_str (fromIntegral len) p_hstring
          c_hstring ←peek p_hstring
          HString <$> newForeignPtr cfp_WindowsDeleteString c_hstring

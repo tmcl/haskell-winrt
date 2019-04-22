@@ -10,12 +10,18 @@ module System.Windows.WinRT.Lowlevel.Monad (
    throwHResult,
    passthrough,
    passthrough2,
-   throwHResult'
+   throwHResult',
+   CULong(..),
+   e_no_interface
 ) where
 
 import Control.Monad.Except
-import System.Win32.Types (HRESULT)
+import Foreign.C.Types
 
+e_no_interface :: HRESULT
+e_no_interface = 0x80004002
+
+type HRESULT = CULong
 type WinRTCore a = ExceptT HRESULT IO a
 type WinRTUnwrapped a = IO (Either HRESULT a)
 

@@ -4,7 +4,11 @@ where
 import Foreign
 import System.Windows.WinRT.Lowlevel.Monad
 
+sizeOfMethodPtr :: Int
 sizeOfMethodPtr = sizeOf (undefined :: FunPtr a)
+
+sizeOfPtr :: Int
+sizeOfPtr = sizeOf (undefined :: Ptr a)
 
 alloca2 ∷ (Storable a, Storable b) ⇒ (Ptr a → Ptr b → IO c) → IO c
 alloca2 f = alloca $ \ p1 → alloca $ \p2 → f p1 p2

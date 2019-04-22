@@ -10,7 +10,7 @@ module System.Windows.WinRT.RoInit (
 where
 
 import Foreign
-import System.Win32.Types (HRESULT)
+import Foreign.C.Types
 import System.Windows.WinRT.Monad
 import System.Windows.WinRT.IUnknown
 import System.Windows.WinRT.Lowlevel.Info

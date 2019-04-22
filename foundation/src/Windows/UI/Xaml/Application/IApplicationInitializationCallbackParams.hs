@@ -3,7 +3,6 @@ module Windows.UI.Xaml.Application.IApplicationInitializationCallbackParams wher
 
 import Foreign
 import System.Windows.GUID
-import System.Windows.WinRT.HString
 import System.Windows.WinRT.Inspectable
 
 interfaceName :: String

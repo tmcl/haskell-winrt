@@ -8,6 +8,7 @@ module System.Windows.WinRT.Inspectable.NewInspectable (newInspectable)
 where
 
 import Foreign
+import Foreign.C.Types
 import System.Windows.WinRT.Inspectable.TheInterface
 import System.Windows.WinRT.Monad
 import System.Windows.WinRT.Lowlevel.HSTRING

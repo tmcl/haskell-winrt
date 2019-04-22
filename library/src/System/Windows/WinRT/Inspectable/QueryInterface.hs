@@ -6,6 +6,7 @@ module System.Windows.WinRT.Inspectable.QueryInterface (queryInterface) where
 
 
 import Foreign
+import Foreign.C.Types
 import System.Windows.GUID
 import System.Windows.WinRT.Monad
 import System.Windows.WinRT.Inspectable.TheInterface

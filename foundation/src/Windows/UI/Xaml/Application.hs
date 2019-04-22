@@ -2,7 +2,6 @@ module Windows.UI.Xaml.Application where
 
 import Foreign
 import System.Windows.GUID
-import System.Windows.WinRT.HString
 import System.Windows.WinRT.Monad
 import System.Windows.WinRT.Inspectable
 import System.Windows.WinRT.RoInit
