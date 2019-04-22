@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Windows.UI.Xaml.Application.IApplicationInitializationCallback where
 
 import Foreign
@@ -63,6 +66,38 @@ instance Storable Something where
       pokeByteOff ptr (off + sizeOfPtr) storedStuff
       pokeByteOff vtablePtr off appl_init_callback_vtable
 
+newtype ApplicationInitializationCallbackImpl = ApplicationInitializationCallbackImpl {
+   callback :: () → WinRT ()
+}
+instance HasVtbl ApplicationInitializationCallbackImpl where
+   newtype VTable ApplicationInitializationCallbackImpl = AppInitCbImpl IApplicationInitializationCallbackVtbl
+      deriving (Storable)
+   mkVtbl addRef release = do
+      qi ← mkDefaultQueryInterface
+      let iunknown = iUnknownVtbl qi addRef release
+      cfp_Invoke ← mkCallbackFunPtr callCallback
+      return $ AppInitCbImpl $ IApplicationInitializationCallbackVtbl {..}
+   freeFunPtrs (AppInitCbImpl vtbl) = do
+      freeFunPtrs $ IUnknownVtblImpl $ iunknown vtbl
+      freeHaskellFunPtr $ cfp_Invoke vtbl
+
+foreign import ccall "wrapper"
+      mkCallbackFunPtr' :: InvokeImpl → IO (FunPtr InvokeImpl)
+
+mkCallbackFunPtr :: InvokeImpl → IO (FunPtr Invoker)
+mkCallbackFunPtr = fmap castFunPtr . mkCallbackFunPtr'
+
+type InvokeImpl = Ptr (IUnknownImpl ApplicationInitializationCallbackImpl) → IO HRESULT
+
+callCallback :: InvokeImpl
+callCallback p_this = do
+   this ← peek p_this
+   info ← deRefStablePtr (impl_stbl this)
+   let localInfo = impld_localInfo info
+   res ← unwrap $ callback localInfo ()
+   return $ case res of
+      Left hres → hres
+      Right () → 0
 
 
 -- newtype LocalApplicationInitializationCallback = LocalApplicationInitializationCallback {

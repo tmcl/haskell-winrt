@@ -66,6 +66,10 @@ myLocalInfo = newIORef $ MyUnknown 0 MyLocalInfo
 invokera :: Invoker
 invokera _ = messageBox Nothing "i am invoker a" "invoker a" mB_OK >> return 0
 
+altInvoker :: () → WinRT ()
+altInvoker _ =
+   void . liftIO $ messageBox Nothing "i am the alt invoker" "invoker a" mB_OK
+
 invoker :: Invoker
 invoker _ = messageBox Nothing "i am tother" "tother" mB_OK >> return 0
 
@@ -87,32 +91,6 @@ showmsg msg = void $ liftIO $ messageBox Nothing msg "a body" mB_OK
 foreign import ccall "wrapper"
       mkInvoke :: Invoker → IO (FunPtr Invoker)
 
-initVtbl :: IO IApplicationInitializationCallbackVtbl
-initVtbl = do
-   iunknown ← my_vtable
-   cfp_Invoke ← mkInvoke invoker
-   return IApplicationInitializationCallbackVtbl {..}
-
-mkOnInit :: IO Something
-mkOnInit = Something <$> initVtbl <*> myLocalInfo 
-
-data Whatever = Whatever 
-instance Storable Whatever where
-   sizeOf _ = 6 * sizeOf ptest_c_add_ref
-   alignment _ = alignment ptest_c_add_ref
-   peek _ptr = return Whatever
-   poke ptr _ = do
-      let n = sizeOf ptest_c_add_ref
-      p_invoke ← mkInvoke invokera
-      p_queryInterface ← mkQIT qit
-      poke (ptr `plusPtr` 0) (ptr `plusPtr` (2*n))
-      poke (ptr `plusPtr` (1*n)) nullPtr
-      poke (ptr `plusPtr` (2*n)) p_queryInterface
-      poke (ptr `plusPtr` (3*n)) ptest_c_add_ref
-      poke (ptr `plusPtr` (4*n)) ptest_c_release
-      poke (ptr `plusPtr` (5*n)) p_invoke
-
-
 it :: WinRT ()
 it = do
    traceIOS "initialised"
@@ -120,38 +98,39 @@ it = do
    -- liftIO $ threadDelay 19666666
    statics :: ApplicationStatics ← getActivationFactory Windows.UI.Xaml.Application.classId
    traceIOS "got the statics, yes i did"
-   withRuntimeInstance statics $ \statics_vtbl statics_this → do
-      let start = mkStart $ cfp_Start statics_vtbl
-      liftIO $ alloca $ \pp_iids -> 
-         alloca $ \p_len -> do
-            let i = inspectable statics_vtbl
-            hres <- (mkgetiids $ cfp_GetIids i) (castPtr statics_this) p_len pp_iids
-            traceIOS hres
-            len <- peek p_len
-            p_iids <- peek pp_iids
-            forM_ [0..fromIntegral len] $ 
-               traceIOS <=< peekElemOff p_iids 
+   startApplication statics $ ApplicationInitializationCallbackImpl altInvoker
+   -- withRuntimeInstance statics $ \statics_vtbl statics_this → do
+   --    let start = mkStart $ cfp_Start statics_vtbl
+   --    liftIO $ alloca $ \pp_iids -> 
+   --       alloca $ \p_len -> do
+   --          let i = inspectable statics_vtbl
+   --          hres <- (mkgetiids $ cfp_GetIids i) (castPtr statics_this) p_len pp_iids
+   --          traceIOS hres
+   --          len <- peek p_len
+   --          p_iids <- peek pp_iids
+   --          forM_ [0..fromIntegral len] $ 
+   --             traceIOS <=< peekElemOff p_iids 
 
-      liftIO $ alloca $ \p_whatever → do
-            showmsg "in the second"
-            traceIOS "yes okay"
-            poke p_whatever Whatever
-            traceIO "poked"
-            res ← start statics_this (castPtr p_whatever)
-            traceIO $ show res
-            traceIOS "ran - to be shown"
-                
-      liftIO $ alloca $ \p_something → do
-         showmsg "in the third"
-         traceIO "allocaed the initialiser"
-         onInit ← mkOnInit
-         poke p_something onInit
-         traceIO "poked the initialiser"
-         -- _ <- start statics_this nullPtr
-         traceIO "null ptr - skipped"
-         res ← start statics_this (castPtr p_something)
-         traceIO "—ran— the initialiser"
-         traceIOS res
+   --    liftIO $ alloca $ \p_whatever → do
+   --          showmsg "in the second"
+   --          traceIOS "yes okay"
+   --          poke p_whatever Whatever
+   --          traceIO "poked"
+   --          res ← start statics_this (castPtr p_whatever)
+   --          traceIO $ show res
+   --          traceIOS "ran - to be shown"
+   --              
+   --    liftIO $ alloca $ \p_something → do
+   --       showmsg "in the third"
+   --       traceIO "allocaed the initialiser"
+   --       onInit ← mkOnInit
+   --       poke p_something onInit
+   --       traceIO "poked the initialiser"
+   --       -- _ <- start statics_this nullPtr
+   --       traceIO "null ptr - skipped"
+   --       res ← start statics_this (castPtr p_something)
+   --       traceIO "—ran— the initialiser"
+   --       traceIOS res
 
 
 

@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module System.Windows.WinRT.IUnknown
 where
 
@@ -125,20 +127,21 @@ mkIunknownvtbl = do
    -- cfp_QueryInterface ← mkInterfaceQuerier hc_QueryInterface
    -- return IUnknownVtbl {..}
 
-newIUnknownImpl ::  HasVtbl a => IO (IUnknownImpl a)
-newIUnknownImpl = do
+newIUnknownImpl ::  HasVtbl a => a → IO (ForeignPtr (IUnknownImpl a))
+newIUnknownImpl a = do
    iunknownvtbl ← mkIunknownvtbl 
    f_theMem :: ForeignPtr (IUnknownImpl a) ← mallocForeignPtr
    let theState = IUnknownImplState 1
    ioref ← newIORef theState
-   let theData = IUnknownImplData ioref f_theMem
+   let theData = IUnknownImplData a ioref f_theMem
    theStableData ← newStablePtr theData
    let theIUnknownImpl = IUnknownImpl iunknownvtbl theStableData
    withForeignPtr f_theMem $ \p_theMem →
       poke p_theMem theIUnknownImpl
-   return theIUnknownImpl
+   return f_theMem
 
 data HasVtbl a => IUnknownImplData a = IUnknownImplData {
+   impld_localInfo :: a,
    impld_ioref :: IORef IUnknownImplState,
    impld_fmem :: ForeignPtr (IUnknownImpl a)
 }
@@ -214,10 +217,24 @@ releaseInternal p_it = do
 --    freeHaskellFunPtr cfp_b
 --    freeHaskellFunPtr cfp_c
 
-
 newtype IUnknownImplState = IUnknownImplState {
    refsCount :: CULong
 }
 
 updateRefCount :: IUnknownImplState → CULong → IUnknownImplState
 updateRefCount old diff = old { refsCount = refsCount old + diff }
+
+data IUnknownImpl'
+
+instance HasVtbl IUnknownImpl' where
+   newtype VTable IUnknownImpl' = IUnknownVtblImpl IUnknownVtbl 
+      deriving (Storable)
+   mkVtbl addRef release = do
+      qi ← mkDefaultQueryInterface
+      return $ IUnknownVtblImpl $ iUnknownVtbl qi addRef release
+  -- we don't use {..} here since we want to free them _all_,
+  -- even if code changes in the future to create more
+   freeFunPtrs (IUnknownVtblImpl (IUnknownVtbl a b c)) = do
+      freeHaskellFunPtr a
+      freeHaskellFunPtr b
+      freeHaskellFunPtr c
