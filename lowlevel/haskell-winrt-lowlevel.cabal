@@ -5,7 +5,7 @@ name:                haskell-winrt-lowlevel
 version:             0.1.0.0
 synopsis:            Lowlevel (~internal) WinRT components
 -- description:
-license:             BSD3
+license:             GPL3
 license-file:        LICENSE
 author:              Tristan Mc Leay
 maintainer:          tristan@cassowary.org

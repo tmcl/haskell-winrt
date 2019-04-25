@@ -6,7 +6,7 @@ version:             0.1.0.0
 synopsis:            Examples for Haskell WinRT
 -- description:
 homepage:            http://github.com/tmcl/haskell-winrt
-license:             BSD3
+license:             GPL3
 license-file:        LICENSE
 author:              Tristan Mc Leay
 maintainer:          tristan@cassowary.org

@@ -99,7 +99,7 @@ instance HasVtbl TestType where
    newtype VTable TestType = TestVtbl IUnknownVtbl 
       deriving (Storable)
    mkVtbl addRef release = do
-      qi ← mkDefaultQueryInterface
+      qi ← mkDefaultQueryInterface [uniid iid]
       return $ TestVtbl $ iUnknownVtbl qi addRef release
   -- we don't use {..} here since we want to free them _all_,
   -- even if code changes in the future to create more

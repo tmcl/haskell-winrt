@@ -16,15 +16,19 @@ import Control.Monad
 -- interfaceName = "Windows.UI.Xaml.IApplicationInitializationCallback"
 
 type InstanceOf menu = Ptr menu
-data RuntimeInstance menu = RuntimeInstance {
+data IsUnknown menu => RuntimeInstance menu = RuntimeInstance {
     foreignPtr :: ForeignPtr (InstanceOf menu),
     vtable :: menu
+}
+
+class IsUnknown vtbl where {
+   fp_QueryInterface :: vtbl → FunPtr UnsafeQueryInterfaceType
 }
 
 -- withIInspectable :: Inspectable → (Ptr IInspectable → WinRT a) → WinRT a
 -- withIInspectable Inspectable{..} act = passthrough . withForeignPtr insp_foreignPtr $ act
 
-withRuntimeInstance :: RuntimeInstance menu → (menu → Ptr (InstanceOf menu) → WinRT a) → WinRT a
+withRuntimeInstance :: IsUnknown menu => RuntimeInstance menu → (menu → Ptr (InstanceOf menu) → WinRT a) → WinRT a
 withRuntimeInstance RuntimeInstance{..} action = 
     passthrough (withForeignPtr foreignPtr) (action vtable)
 
@@ -34,7 +38,7 @@ iid = IID $ GUID 0x00000000 0x0000 0x0000
 
 type REFIID = Ptr GUID
 type UnsafeQueryInterfaceType = Ptr IUnknown → REFIID → Ptr (Ptr IUnknown) → IO HRESULT
-type QueryInterfaceType b = Ptr IUnknown → Ptr (IID b) → Ptr (Ptr (Ptr b)) → IO HRESULT
+type QueryInterfaceType a b = Ptr (Ptr a) → Ptr (IID b) → Ptr (Ptr (Ptr b)) → IO HRESULT
 
 type RefCountMethod = Ptr IUnknown → IO CULong
 type RefCountMethodImpl a = Ptr (IUnknownImpl a)→ IO CULong
@@ -44,6 +48,10 @@ data IUnknownVtbl = IUnknownVtbl {
    cfp_AddRef :: FunPtr RefCountMethod,
    cfp_Release :: FunPtr RefCountMethod
 }
+
+instance IsUnknown IUnknownVtbl where
+   fp_QueryInterface = cfp_QueryInterface
+
 
 type IUnknown = Ptr IUnknownVtbl
 
@@ -91,13 +99,13 @@ mkRefCounter = fmap castFunPtr . mkRefCounter'
 foreign import ccall "wrapper"
       mkInterfaceQuerier :: UnsafeQueryInterfaceType → IO (FunPtr UnsafeQueryInterfaceType)
 
-mkDefaultQueryInterface :: IO (FunPtr UnsafeQueryInterfaceType) 
-mkDefaultQueryInterface = mkInterfaceQuerier defaultQueryInterface
+mkDefaultQueryInterface :: [GUID] → IO (FunPtr UnsafeQueryInterfaceType) 
+mkDefaultQueryInterface = mkInterfaceQuerier . defaultQueryInterface
 
-defaultQueryInterface :: UnsafeQueryInterfaceType
-defaultQueryInterface p_in p_iid pp_out = do
+defaultQueryInterface :: [GUID] → UnsafeQueryInterfaceType
+defaultQueryInterface guids p_in p_iid pp_out = do
    targetIID ← peek p_iid
-   if uniid iid == targetIID 
+   if targetIID `elem` guids
       then do
          -- todo: increase refcount in this unlikely event
          poke pp_out p_in
@@ -230,7 +238,7 @@ instance HasVtbl IUnknownImpl' where
    newtype VTable IUnknownImpl' = IUnknownVtblImpl IUnknownVtbl 
       deriving (Storable)
    mkVtbl addRef release = do
-      qi ← mkDefaultQueryInterface
+      qi ← mkDefaultQueryInterface [uniid iid]
       return $ IUnknownVtblImpl $ iUnknownVtbl qi addRef release
   -- we don't use {..} here since we want to free them _all_,
   -- even if code changes in the future to create more

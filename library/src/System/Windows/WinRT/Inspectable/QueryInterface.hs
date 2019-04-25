@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE RankNTypes #-}
 
-module System.Windows.WinRT.Inspectable.QueryInterface (queryInterface) where
+module System.Windows.WinRT.Inspectable.QueryInterface (queryInterface, IsQueriable(..)) where
 
 
 import Foreign
@@ -18,18 +18,21 @@ import Unsafe.Coerce
 foreign import ccall "dynamic"
    mkQueryInterface' :: FunPtr UnsafeQueryInterfaceType → UnsafeQueryInterfaceType
 
-newtype QIT a = QIT { unQIT :: QueryInterfaceType a }
-mkQueryInterface :: FunPtr UnsafeQueryInterfaceType → QIT a
+newtype QIT a b = QIT { unQIT :: QueryInterfaceType a b }
+mkQueryInterface :: FunPtr UnsafeQueryInterfaceType → QIT a b
 mkQueryInterface fp = QIT (unsafeCoerce (mkQueryInterface' fp))
 
-queryInterface :: (ForeignPtr IInspectable → IInspectableVtbl →Inspectable) → IID IInspectableVtbl → Unknown → WinRT Inspectable
-queryInterface make my_guid unknown =
-   withRuntimeInstance unknown $ \IUnknownVtbl{..} p_unknown  →
-      alloca2' $ \p_guid (pp_res :: Ptr (Ptr (Ptr IInspectableVtbl))) → do
+class (Storable a, IsUnknown a) => IsQueriable a where
+   make :: ForeignPtr (Ptr a) → a → RuntimeInstance a
+
+queryInterface :: (IsUnknown b, IsQueriable a) => IID a → (RuntimeInstance b) → WinRT (RuntimeInstance a)
+queryInterface my_guid unknown =
+   withRuntimeInstance unknown $ \vtbl_in p_unknown  →
+      alloca2wrt $ \p_guid (pp_res :: Ptr (Ptr (Ptr a))) → do
          liftIO $ poke p_guid my_guid
          let 
-            doQueryInterface :: QueryInterfaceType IInspectableVtbl
-            doQueryInterface = unQIT $ mkQueryInterface cfp_QueryInterface
+            doQueryInterface :: QueryInterfaceType b a
+            doQueryInterface = unQIT $ mkQueryInterface $ fp_QueryInterface vtbl_in
          try $ doQueryInterface p_unknown p_guid pp_res
          liftIO $ do
             p_res ← peek pp_res

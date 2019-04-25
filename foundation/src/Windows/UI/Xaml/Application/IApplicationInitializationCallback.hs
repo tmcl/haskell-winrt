@@ -6,10 +6,12 @@ module Windows.UI.Xaml.Application.IApplicationInitializationCallback where
 import Foreign
 import Control.Monad
 import System.Windows.GUID
-import System.Windows.WinRT.IUnknown
+import System.Windows.WinRT.IUnknown hiding (iid)
+import qualified System.Windows.WinRT.IUnknown (iid)
+import qualified System.Windows.WinRT.Inspectable
 import System.Windows.WinRT.Monad
 import System.Windows.WinRT.Lowlevel.Info
-import Windows.UI.Xaml.Application.IApplicationInitializationCallbackParams
+import Windows.UI.Xaml.Application.IApplicationInitializationCallbackParams hiding (iid)
 
 -- interfaceName :: String
 -- interfaceName = "Windows.UI.Xaml.IApplicationInitializationCallback"
@@ -73,7 +75,7 @@ instance HasVtbl ApplicationInitializationCallbackImpl where
    newtype VTable ApplicationInitializationCallbackImpl = AppInitCbImpl IApplicationInitializationCallbackVtbl
       deriving (Storable)
    mkVtbl addRef release = do
-      qi ← mkDefaultQueryInterface
+      qi ← mkDefaultQueryInterface iids
       let iunknown = iUnknownVtbl qi addRef release
       cfp_Invoke ← mkCallbackFunPtr callCallback
       return $ AppInitCbImpl $ IApplicationInitializationCallbackVtbl {..}
@@ -114,3 +116,9 @@ callCallback p_this = do
 -- new :: (Ptr IApplicationInitializationCallbackParams → HRESULT) → WinRT ApplicationInitializationCallback
 -- new cb = do
 --    mallocForeignPtr 
+
+iids :: [GUID]
+iids = 
+   [ uniid System.Windows.WinRT.IUnknown.iid
+   , uniid System.Windows.WinRT.Inspectable.iid
+   , uniid iid ]

@@ -1,7 +1,7 @@
 name: winrt-hs
 description: haskell access to WinRT/UWP protocols
 version: 0.1
-license: BSD3
+license: GPL3
 author: Tristan
 build-type: Simple
 cabal-version: >=1.10

@@ -5,7 +5,7 @@ import Windows.UI.Xaml.Application.IApplicationInitializationCallback hiding (ii
 -- import Windows.UI.Xaml.Application.IApplicationInitializationCallbackParams hiding (iid)
 import Foreign
 import System.Windows.GUID
-import System.Windows.WinRT.Inspectable
+import System.Windows.WinRT.Inspectable hiding (iid)
 import System.Windows.WinRT.IUnknown hiding (iid)
 import System.Windows.WinRT.Monad
 import System.Windows.WinRT.RoInit
@@ -38,6 +38,9 @@ data IApplicationStaticsVtbl = IApplicationStaticsVtbl {
    cfp_LoadComponent :: FunPtr (Ptr IApplicationStatics → Ptr IInspectable → Ptr Uri → IO HRESULT),
    cfp_LoadComponentWithResourceLocation :: FunPtr (Ptr IApplicationStatics → Ptr IInspectable → Ptr Uri →ComponentResourceLocation → IO HRESULT)
 }
+
+instance IsUnknown IApplicationStaticsVtbl where
+   fp_QueryInterface = fp_QueryInterface . inspectable
 
 startApplication :: ApplicationStatics → ApplicationInitializationCallbackImpl → WinRT ()
 startApplication statics cb = do 

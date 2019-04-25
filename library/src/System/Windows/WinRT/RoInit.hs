@@ -31,7 +31,7 @@ foreign import ccall "RoGetActivationFactory"
 
 newtype ClassId a = ClassId String
 
-class Storable b => ActivatableFactory b where
+class (Storable b, IsUnknown b) => ActivatableFactory b where
     af_iid :: IID b
 
 getActivationFactory :: ActivatableFactory b => ClassId a → WinRT (RuntimeInstance b)

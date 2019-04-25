@@ -7,17 +7,17 @@
 module System.Windows.WinRT.Inspectable (
    module System.Windows.WinRT.Inspectable.TheInterface,
    module System.Windows.WinRT.Inspectable.QueryInterface,
-   module System.Windows.WinRT.Inspectable.NewInspectable
+   module System.Windows.WinRT.Inspectable.NewInspectable,
+   iid
 )
 where
 
+import System.Windows.GUID
 import System.Windows.WinRT.Inspectable.TheInterface
 import System.Windows.WinRT.Inspectable.QueryInterface
 import System.Windows.WinRT.Inspectable.NewInspectable
 
--- new :: (IsInspectable a) => InspectableInfo a → WinRT a
--- new runtimeClass = do
---    let my_className = className runtimeClass
---    insp ← newInspectable my_className
---    out :: a ← queryInterface (iid runtimeClass) insp
---    return out
+iid :: IID ()
+iid = IID $ GUID 
+   0xAF86E2E0 0xB12D 0x4c6a 
+   0x9C 0x5A 0xD7 0xAA 0x65 0x10 0x1E 0x90

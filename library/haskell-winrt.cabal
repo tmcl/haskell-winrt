@@ -6,7 +6,7 @@ version:             0.1.0.0
 synopsis:            Library that enables the use of WinRT
 description: This is the core of WinRT. see also haskell-winrt-examples
 homepage:            https://github.com/tmcl/haskell-winrt
-license:             BSD3
+license:             GPL3
 license-file:        LICENSE
 author:              Tristan Mc Leay
 maintainer:          tristan@cassowary.org
